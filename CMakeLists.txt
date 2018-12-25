@@ -4,7 +4,7 @@ project(HotReload)
 add_subdirectory("extern")
 
 file(GLOB_RECURSE SOURCE_FILES "src/*.cc" "src/*.cpp")
-file(GLOB_RECURSE HEADER_FILES "src/*.hh" "src/*.h")
+file(GLOB_RECURSE HEADER_FILES "include/*.hh" "include/*.h")
 
 if(MSVC)
     set(HOTRELOAD_LINK_TYPE STATIC)
@@ -15,6 +15,6 @@ endif()
 add_library(hotReload ${HOTRELOAD_LINK_TYPE} ${SOURCE_FILES} ${HEADER_FILES})
 
 target_include_directories(hotReload PUBLIC
-    src/
+    include/
     extern/simplefilewatcher/include
 )
