@@ -1,0 +1,3 @@
+[submodule "extern\\simplefilewatcher"]
+	path = extern\\simplefilewatcher
+	url = https://github.com/apetrone/simplefilewatcher.git
