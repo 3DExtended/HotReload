@@ -3,6 +3,7 @@
 #include <functional>
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <FileWatcher/FileWatcher.h>
@@ -17,6 +18,8 @@ struct CallbackParameter
     FW::Action action;
 };
 
+typedef std::function<void(const std::string &, const std::string &, FW::Action)> callback;
+
 class HotReload
 {
   public:
@@ -29,26 +32,26 @@ class HotReload
       // should get called at a latter point.
       void registerCallback(
           std::string path, 
-          std::function<void(const std::string &, const std::string &, FW::Action)> callback)
+          callback callback)
       {
           // add a watch to the system
-          auto gWatchID = gFileWatcher->addWatch(path,this->queueCallbackListener,true);
-          this->watches[path] = gWatchID;
-          this->callbacks[gWatchID] = callback;
+          registerCallbackMutex.lock();
+          registerCallbackList.push_back(std::make_pair(path, callback));
+          registerCallbackMutex.unlock();
       }
 
       // Removes a watch by specifing the path to the file the watch was listening to.
       void removeCallback(
           std::string path)
       {
-          this->watches.erase(path);
-          this->gFileWatcher->removeWatch(path);
+          // TODO make thread save
+          //this->watches.erase(path);
+          //this->gFileWatcher->removeWatch(path);
       }
 
       // Calls the callbacks when they were queued by the filewatcher.
       void update()
       {
-          this->fetchFileChanges();
           for each (auto callbackParams in queuedCallbacks)
           {
               callbacks[callbackParams.watchID](
@@ -94,10 +97,15 @@ class HotReload
     std::map<std::string, FW::WatchID> watches;
 
     // List of active callbacks
-    std::map<FW::WatchID, std::function<void(const std::string &, const std::string &, FW::Action)>> callbacks;
+    std::map<FW::WatchID, callback> callbacks;
 
     // List of queued callbacks
     std::vector<CallbackParameter> queuedCallbacks;
+
+    // needed for multithreaded access to registerCallback
+    std::mutex registerCallbackMutex;
+    // List of callbacks to register (by the fetching thread)
+    std::vector<std::pair<std::string, callback>> registerCallbackList;
 
   private:
     // thread for async checks for file changes
@@ -107,10 +115,20 @@ class HotReload
     // function for thread
     // loops, until fetchNewChanges gets set to false
     void fetchFileChanges() {
-        //while (this->fetchNewChanges) {
+        while (this->fetchNewChanges) {
+            registerCallbackMutex.lock();
+            for each (auto pair in registerCallbackList)
+            {
+                auto gWatchID = gFileWatcher->addWatch(pair.first, this->queueCallbackListener, true);
+                this->watches[pair.first] = gWatchID;
+                this->callbacks[gWatchID] = pair.second;
+            }
+            registerCallbackList.clear();
+            registerCallbackMutex.unlock();
+
             this->gFileWatcher->update();
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        //}
+        }
     }
 
     // queue file change callbacks so the main thread can execute them
@@ -122,7 +140,7 @@ class HotReload
 
     // singleton pattern
     HotReload() {
-        //updateFileChanges = new std::thread(&HR::HotReload::fetchFileChanges, this);
+        updateFileChanges = new std::thread(&HR::HotReload::fetchFileChanges, this);
     }
 };
 } // namespace HotReload

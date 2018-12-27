@@ -8,3 +8,6 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 /build
+/example/bin/Debug/Example.exe
+/example/bin/Debug/Example.ilk
+/example/bin/Debug/Example.pdb
