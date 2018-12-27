@@ -20,8 +20,8 @@ int main(int argc, char const *argv[])
 
     while (true)
     {
-        std::cout << "Running..." << std::endl;
-        hr->update();
+        std::cout << "Try changing a file within ./changeDir..." << std::endl;
+        hr->update(); // call me regulary (it does nothing if there was no file change)
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
     return 0;
