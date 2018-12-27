@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(HotReload)
 
-file(GLOB_RECURSE SOURCE_FILES "src/*.cc" "src/*.cpp")
+file(GLOB_RECURSE SOURCE_FILES "include/*.cc" "include/*.cpp")
 file(GLOB_RECURSE HEADER_FILES "include/*.hh" "include/*.h")
 
 if(MSVC)
