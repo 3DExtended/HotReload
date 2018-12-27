@@ -1,5 +1,4 @@
 #include <map>
-#include <memory>
 #include <functional>
 #include <chrono>
 #include <thread>
@@ -23,13 +22,16 @@ typedef std::function<void(const std::string &, const std::string &, FW::Action)
 class HotReload
 {
   public:
+
+      // Singleton pattern since we only need one thread looking for file changes. 
+      // You can still watch multiple directories.
       static HotReload* instance() {
           static HotReload* instance = new HotReload();
           return instance;
       }
 
-      // Register a new watch by specifing the path to the file and a callback which 
-      // should get called at a latter point.
+      // Register a new watch by specifing the path to the directory and a callback which 
+      // should get called whenever files in that directory where modified/created/deleted.
       void registerCallback(
           std::string path, 
           callback callback)
@@ -43,10 +45,11 @@ class HotReload
       // Removes a watch by specifing the path to the file the watch was listening to.
       void removeCallback(
           std::string path)
-      {
-          // TODO make thread save
-          //this->watches.erase(path);
-          //this->gFileWatcher->removeWatch(path);
+      {          
+          registerCallbackMutex.lock();
+          deleteCallbackList.push_back(path);
+          registerCallbackMutex.unlock();
+
       }
 
       // Calls the callbacks when they were queued by the filewatcher.
@@ -102,10 +105,15 @@ class HotReload
     // List of queued callbacks
     std::vector<CallbackParameter> queuedCallbacks;
 
-    // needed for multithreaded access to registerCallback
+    // needed for multithreaded access to registerCallbackList
     std::mutex registerCallbackMutex;
     // List of callbacks to register (by the fetching thread)
     std::vector<std::pair<std::string, callback>> registerCallbackList;
+
+    // needed for multithreaded access to deleteCallbackList
+    std::mutex deleteCallbackMutex;
+    // List of callbacks to register (by the fetching thread)
+    std::vector<std::string> deleteCallbackList;
 
   private:
     // thread for async checks for file changes
@@ -116,6 +124,7 @@ class HotReload
     // loops, until fetchNewChanges gets set to false
     void fetchFileChanges() {
         while (this->fetchNewChanges) {
+            //first look if there were watches added and add them here, too.
             registerCallbackMutex.lock();
             for each (auto pair in registerCallbackList)
             {
@@ -126,6 +135,17 @@ class HotReload
             registerCallbackList.clear();
             registerCallbackMutex.unlock();
 
+            //delete old watches
+            deleteCallbackMutex.lock();
+            for each (auto str in deleteCallbackList)
+            {
+                this->watches.erase(str);
+                this->gFileWatcher->removeWatch(str);
+            }
+            deleteCallbackList.clear();
+            deleteCallbackMutex.unlock();
+
+            // update filewatcher
             this->gFileWatcher->update();
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
